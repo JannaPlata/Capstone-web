@@ -1,0 +1,6 @@
+{
+    "room_id": 1,
+    "room_number": "101",
+    "room_type_id": 1,
+    "status": "available"
+}
