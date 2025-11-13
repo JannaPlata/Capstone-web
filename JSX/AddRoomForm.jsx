@@ -16,6 +16,7 @@ export default function RoomFormModal({ isOpen, onClose, initialData = null, onA
 
   const isBookingView = initialData && initialData.booking !== undefined;
 
+  const isEditing = Boolean(initialData && initialData.room_id);
 
   const [form, setForm] = useState({
     roomNumber: "",
@@ -172,7 +173,8 @@ export default function RoomFormModal({ isOpen, onClose, initialData = null, onA
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Price per Night</label>
-                  <input type="number" value={form.pricePerNight} onChange={(e) => setForm((p) => ({ ...p, pricePerNight: e.target.value }))} placeholder="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                  <input type="number" value={form.pricePerNight} onChange={(e) => setForm((p) => ({ ...p, pricePerNight: e.target.value }))} placeholder="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                  disabled={isEditing}/>
                 </div>
 
                 <div>
@@ -188,14 +190,16 @@ export default function RoomFormModal({ isOpen, onClose, initialData = null, onA
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Capacity (Adults)</label>
-                  <select value={form.capacityAdults} onChange={(e) => setForm((p) => ({ ...p, capacityAdults: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                  <select value={form.capacityAdults} onChange={(e) => setForm((p) => ({ ...p, capacityAdults: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white" 
+                  disabled={isEditing}>
                     {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Capacity (Children)</label>
-                  <select value={form.capacityChildren} onChange={(e) => setForm((p) => ({ ...p, capacityChildren: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                  <select value={form.capacityChildren} onChange={(e) => setForm((p) => ({ ...p, capacityChildren: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  disabled={isEditing}>
                     {[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>

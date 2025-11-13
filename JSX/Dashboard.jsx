@@ -81,43 +81,56 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const dateParams = getDateRange(dateRange);
-        const queryString = dateParams 
-          ? `?start=${dateParams.start}&end=${dateParams.end}`
-          : '';
-
-        const [statsRes, recentRes, monthlyRes] = await Promise.all([
-          fetch(`/api/dashboard/stats${queryString}`),
-          fetch(`/api/dashboard/recent-bookings?limit=10${dateParams ? `&start=${dateParams.start}&end=${dateParams.end}` : ''}`),
-          fetch(`/api/dashboard/trends${queryString}`)
-        ]);
-
-        const [statsData, recentData, monthlyData] = await Promise.all([
-          statsRes.json(),
-          recentRes.json(),
-          monthlyRes.json()
-        ]);
-
-        setDashboardData({ 
-          stats: statsData.success ? statsData.data : { 
-            total_bookings: 0, 
-            pending_bookings: 0, 
-            confirmed_bookings: 0, 
-            checked_in: 0, 
-            checked_out: 0, 
-            cancelled: 0 
-          },
-          recentBookings: recentData.success ? recentData.data : [],
-          monthlyBookings: monthlyData.success ? monthlyData.data : { labels: [], counts: [] }
-        });
-      } catch (error) {
-        console.error('Failed to load dashboard data:', error);
+  const loadData = async () => {
+    try {
+      let dateParams = null;
+      
+      // Handle custom range
+      if (dateRange === 'custom' && customRange[0]) {
+        const start = customRange[0].startDate;
+        const end = customRange[0].endDate;
+        dateParams = {
+          start: start.toISOString().split('T')[0],
+          end: end.toISOString().split('T')[0]
+        };
+      } else {
+        dateParams = getDateRange(dateRange);
       }
-    };
-    loadData();
-  }, [dateRange]);
+      
+      const queryString = dateParams 
+        ? `?start=${dateParams.start}&end=${dateParams.end}`
+        : '';
+
+      const [statsRes, recentRes, monthlyRes] = await Promise.all([
+        fetch(`http://localhost:3000/api/dashboard/stats${queryString}`),
+        fetch(`http://localhost:3000/api/dashboard/recent-bookings?limit=5${dateParams ? `&start=${dateParams.start}&end=${dateParams.end}` : ''}`),
+        fetch(`http://localhost:3000/api/dashboard/trends${queryString}`)
+      ]);
+
+      const [statsData, recentData, monthlyData] = await Promise.all([
+        statsRes.json(),
+        recentRes.json(),
+        monthlyRes.json()
+      ]);
+
+      setDashboardData({ 
+        stats: statsData.success ? statsData.data : { 
+          total_bookings: 0, 
+          pending_bookings: 0, 
+          confirmed_bookings: 0, 
+          checked_in: 0, 
+          checked_out: 0, 
+          cancelled: 0 
+        },
+        recentBookings: recentData.success ? recentData.data : [],
+        monthlyBookings: monthlyData.success ? monthlyData.data : { labels: [], counts: [] }
+      });
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    }
+  };
+  loadData();
+}, [dateRange, customRange]);
 
   const filterButtons = [
     { label: 'Last 7 Days', value: 'week' },
@@ -189,26 +202,42 @@ const Dashboard = () => {
   };
 
   const getStatusBadgeVariant = (status) => {
-    const normalizedStatus = status?.toLowerCase() || '';
-    if (['confirmed', 'checked-in', 'checked-out'].includes(normalizedStatus)) {
+  const normalizedStatus = (status || '').toLowerCase();
+
+  switch (normalizedStatus) {
+    case 'confirmed':
+    case 'checked-in':
+    case 'checked out':
+    case 'checked-out':
       return 'success';
-    }
-    if (normalizedStatus === 'cancelled') {
+    case 'cancelled':
       return 'destructive';
-    }
-    return 'warning';
-  };
+    default:
+      return 'warning';
+  }
+};
+
 
   const getPaymentBadgeVariant = (payment) => {
-    const normalizedPayment = payment?.toLowerCase() || '';
-    if (normalizedPayment.includes('complete') || normalizedPayment === 'paid') {
+  const normalizedPayment = (payment || '').toLowerCase();
+
+  switch (normalizedPayment) {
+    case 'paid':
+    case 'completed':
+    case 'complete':
       return 'success';
-    }
-    if (normalizedPayment.includes('partial')) {
+    case 'reserved':
+    case 'partial':
+    case 'pending':
       return 'warning';
-    }
-    return 'secondary';
-  };
+    case 'failed':
+    case 'refunded':
+      return 'destructive';
+    default:
+      return 'secondary';
+  }
+};
+
 
   const chartData = dashboardData.monthlyBookings.labels.map((label, index) => ({
     month: label,
@@ -285,11 +314,15 @@ const Dashboard = () => {
           Cancel
         </button>
         <button
-          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          onClick={() => setShowCustomRange(false)}
-        >
-          Apply
-        </button>
+  className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+  onClick={() => {
+    setShowCustomRange(false);
+    // Force a re-render by updating the dateRange state
+    setDateRange('custom');
+  }}
+>
+  Apply
+</button>
       </div>
     </div>
   )}
@@ -415,8 +448,8 @@ const Dashboard = () => {
                         <td className="py-4 px-4 text-sm text-gray-900">{booking.guest_name || 'Guest'}</td>
                         <td className="py-4 px-4 text-sm text-gray-900">{booking.room_type || '—'}</td>
                         <td className="py-4 px-4 text-sm text-gray-900 hidden md:table-cell">{booking.room_number || '—'}</td>
-                        <td className="py-4 px-4 text-sm text-gray-900 hidden lg:table-cell">{booking.check_in_date || '—'}</td>
-                        <td className="py-4 px-4 text-sm text-gray-900 hidden lg:table-cell">{booking.check_out_date || '—'}</td>
+                        <td className="py-4 px-4 text-sm text-gray-900 hidden lg:table-cell">{booking.check_in || '—'}</td>
+                        <td className="py-4 px-4 text-sm text-gray-900 hidden lg:table-cell">{booking.check_out || '—'}</td>
                         <td className="py-4 px-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBadgeStyles(getPaymentBadgeVariant(booking.payment_status))}`}>
                             {booking.payment_status || 'Pending'}
@@ -424,7 +457,7 @@ const Dashboard = () => {
                         </td>
                         <td className="py-4 px-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBadgeStyles(getStatusBadgeVariant(booking.status))}`}>
-                            {booking.status || 'Pending'}
+                            {booking.status || 'Confirmed'}
                           </span>
                         </td>
                         <td className="py-4 px-4">

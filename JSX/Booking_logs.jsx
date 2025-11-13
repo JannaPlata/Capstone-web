@@ -6,22 +6,18 @@ import Title from '../../components/Title';
 const STATUS_CONFIG = {
   'Confirmed': { 
     color: 'bg-green-100 text-green-700 border-green-200',
-    icon: '✅',
     label: 'Confirmed'
   },
   'Cancelled': { 
     color: 'bg-red-100 text-red-700 border-red-200',
-    icon: '❌',
     label: 'Cancelled'
   },
   'Checked-in': { 
     color: 'bg-blue-100 text-blue-700 border-blue-200',
-    icon: '🔵',
     label: 'Checked-in'
   },
   'Checked-out': { 
     color: 'bg-gray-100 text-gray-700 border-gray-200',
-    icon: '✓',
     label: 'Checked-out'
   },
 };
@@ -334,8 +330,8 @@ const BookingLogs = () => {
   };
 
   return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-7xl px-4">
+    <div className="w-full flex justify-center overflow-x-visible">
+      <div className="w-full max-w-[90rem] px-4">
         {/* Page Header */}
         <div className="mb-8">
           {/* Title and Action Buttons */}
@@ -465,8 +461,8 @@ const BookingLogs = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-          <table className="w-full table-auto min-w-0">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-visible w-full">
+          <table className="min-w-full table-auto">
             <thead className="bg-gray-50">
               <tr>
                 <th className="py-4 px-6 text-center text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('logId')}>
@@ -568,7 +564,7 @@ const BookingLogs = () => {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="font-semibold text-gray-900">{log.guestName}</div>
+                      <div className="text-sm font-semibold text-gray-900">{log.guestName}</div>
                       {log.email && (
                         <div className="text-xs text-gray-500 mt-0.5">{log.email}</div>
                       )}

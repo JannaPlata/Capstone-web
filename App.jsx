@@ -5,23 +5,24 @@ import Home from './pages/Home'
 import Footer from './components/Footer'
 import AllRooms from './pages/AllRooms'
 import RoomDetails from './pages/RoomDetails'
-import MyBookings from './pages/hotelOwner/MyBookings'
+import MyBookings from './pages/MyBookings'
 import Layout from './pages/hotelOwner/Layout'
 import Dashboard from './pages/hotelOwner/Dashboard'
 import AddRoom from './pages/hotelOwner/AddRoom'
-import ListRoom from './pages/hotelOwner/AddRoom'
-import Bookings from './pages/hotelOwner/Bookings'
-import BookingLogs from './pages/hotelOwner/Booking_logs'
 import Events from './pages/Events'
 import Dining from './pages/Dining'
 import AddEvent from './pages/hotelOwner/AddEvent'
-import LoginForm from './components/LoginForm'
 import About from './pages/About'
 import {Toaster} from 'react-hot-toast'
-import { useAppContext } from './context/AppContext'
 import HotelReg from './components/HotelReg'
-import Guests from './pages/hotelOwner/Guests';
-
+import { useAppContext } from './context/AppContext'
+import LoginForm from './pages/LoginForm'
+import FaqButton from './components/FaqButton'
+import Offers from './pages/Offers'
+import Booking_logs from './pages/hotelOwner/Booking_logs'
+import Bookings from './pages/hotelOwner/Bookings'
+import EventReservations from './pages/hotelOwner/EventReservations'
+import EventReservationsLogs from './pages/hotelOwner/EventReservationsLogs'
 
 
 const App = () => {
@@ -34,31 +35,36 @@ const App = () => {
     <div>
       <Toaster />
       {!isOwnerPath && <Navbar />}
-      {showHotelReg && <HotelReg />}
+      {showHotelReg && <HotelReg />} 
     <div className='min-h-[70vh]'>
       <Routes>
         <Route path='/' element={<Home/>} />
-        <Route path='/rooms' element={<AllRooms/>} />
+        <Route path='/accommodation' element={<AllRooms/>} />
         <Route path='/events' element={<Events />} />
         <Route path='/dining' element={<Dining/>}/>
         <Route path='/about' element={<About/>}/>
+        <Route path='/offers' element={<Offers/>}/>
         
+        <Route path='/login' element={<LoginForm />} />
+
         <Route path='/rooms/:id' element={<RoomDetails/>} />
         <Route path='/my-bookings' element={<MyBookings/>} />
-        <Route path='/login' element={<LoginForm/>}/>
         
         <Route path='/owner' element={<Layout/>}>
             <Route index element={<Dashboard />} />
             <Route path="add-room" element={<AddRoom />} />
-            <Route path="list-room" element={<ListRoom />} />
-            <Route path="bookings" element={<Bookings />} />
-            <Route path="booking_logs" element={<BookingLogs />} />
-            <Route path="guest" element={<Guests />} />
             <Route path="add-event" element={<AddEvent />} />
+            <Route path="booking-logs" element={<Booking_logs />} />
+            <Route path="bookings" element={<Bookings />} />
+            <Route path='event-reservations' element={<EventReservations />} />
+            <Route path='event-reservations-logs' element={<EventReservationsLogs />} />
+            
+
         </Route>
       </Routes>
     </div>
-    {!isOwnerPath && <Footer />}
+    <Footer />
+    <FaqButton />
     </div>
   )
 }

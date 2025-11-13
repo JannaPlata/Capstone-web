@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 const sliceId = (id) => `#${String(id).slice(-6)}`;
 const formatPrice = (v) => `₱${Number(v || 0).toLocaleString()}`;
@@ -28,7 +28,6 @@ export default function RoomTable({
   isAllSelected,
   onEdit,
   onDelete,
-  onViewBooking,
   currentPage,
   pageCount,
   onPageChange,
@@ -59,7 +58,6 @@ export default function RoomTable({
               <th className="py-4 px-6 text-left text-sm font-medium text-gray-700">Price per Night</th>
               <th className="py-4 px-6 text-left text-sm font-medium text-gray-700">Capacity</th>
               <th className="py-4 px-6 text-left text-sm font-medium text-gray-700">Status</th>
-              <th className="py-4 px-6 text-left text-sm font-medium text-gray-700">View</th>
               <th className="py-4 px-6 text-left text-sm font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
@@ -133,20 +131,6 @@ export default function RoomTable({
                       >
                         {statusConfig.label}
                       </span>
-                    </td>
-
-                    <td className="py-4 px-6">
-                      {["booked", "occupied"].includes((room.status || "").toLowerCase()) ? (
-                        <button
-                          onClick={() => onViewBooking(room)}
-                          className="w-8 h-8 inline-flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
-                          title="View Booking"
-                        >
-                          <Eye className="w-5 h-5 text-gray-600" />
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
                     </td>
 
                     <td className="py-4 px-6">
