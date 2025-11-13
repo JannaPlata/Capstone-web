@@ -1,7 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Title from '../../components/Title';
 import { assets } from '../../assets/assets';
 import '../../styles/dashboard.css';
+import { useAppContext } from '../../context/AppContext';
+
+const toManilaDateTime = (date = new Date()) => {
+  const manilaTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  const year = manilaTime.getFullYear();
+  const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
+  const day = String(manilaTime.getDate()).padStart(2, "0");
+  const hours = String(manilaTime.getHours()).padStart(2, "0");
+  const minutes = String(manilaTime.getMinutes()).padStart(2, "0");
+  const seconds = String(manilaTime.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
 
 /* Normalize status from database format to lowercase with underscores */
 const normalizeStatus = (status) => {
@@ -35,11 +47,9 @@ const PAYMENT_STATUS_LABELS = {
 
 /* Map booking */
 const mapBookingData = (b) => {
-  // Only use check_in_time/check_out_time if they exist (actual check-in/out was performed)
-  // Don't use check_in/check_out dates as they are just booking dates (default to midnight)
-  // check_in_time and check_out_time contain the actual datetime when check-in/out was performed
-  const checkInTime = b.check_in_time || null; // Only use if check-in was actually performed
-  const checkOutTime = b.check_out_time || null; // Only use if check-out was actually performed
+
+  const checkInTime = b.check_in_time || null; 
+  const checkOutTime = b.check_out_time || null; 
   
   const normalizedPaymentStatus = normalizePaymentStatus(b.payment_status);
   const displayPaymentStatus = PAYMENT_STATUS_LABELS[normalizedPaymentStatus] || 'Pending';
@@ -91,31 +101,39 @@ const Bookings = () => {
   // Cancel confirmation modal state
   const [cancelModal, setCancelModal] = useState({ open: false, booking: null });
 
-  // API endpoints
-  const BOOKINGS_API = 'http://localhost:8000/api/bookings/getBookings.php';
-  const UPDATE_STATUS_API = 'http://localhost:8000/api/bookings/updateBookingStatus.php';
+  //API endpoints
+  const BOOKINGS_API = 'http://localhost:3000/api/bookings/admin/all'; 
+  const UPDATE_STATUS_API = 'http://localhost:3000/api/bookings/admin/update-status'; 
 
-  // fetch bookings
-  const refetch = async () => {
-  try {
-    setLoading(true);
-    const res = await fetch(BOOKINGS_API);
-    const json = await res.json();
-    const arr = Array.isArray(json) ? json : (json.data ?? []);
-    const mapped = arr.map(mapBookingData);
-    // Filter out checked-out and cancelled bookings (they go to booking logs)
-    setBookings(mapped.filter(b => b.status !== 'checked_out' && b.status !== 'cancelled'));
-  } catch (err) {
-    console.error('Failed to fetch bookings', err);
-    setBookings([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  const { token: contextToken } = useAppContext();
+
+  // fetch bookings - NO TOKEN REQUIRED for admin endpoints
+  const refetch = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const res = await fetch(BOOKINGS_API, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const arr = Array.isArray(json) ? json : (json.data ?? []);
+      const mapped = arr.map(mapBookingData);
+      setBookings(mapped.filter(b => b.status !== 'checked_out' && b.status !== 'cancelled'));
+    } catch (err) {
+      console.error('Failed to fetch bookings', err);
+      setBookings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     refetch();
-  }, []);
+  }, [refetch]);
 
   // filters
   useEffect(() => {
@@ -133,73 +151,76 @@ const Bookings = () => {
   }, [bookings, searchTerm, statusFilter, roomTypeFilter, dateFilter, checkOutFilter]);
 
   // api action handler
- const handleBookingAction = async (booking, action, options = {}) => {
-  try {
-    setActionLoading(true);
-    let response;
-    const datetime = options.datetime || null;
+  const handleBookingAction = async (booking, action) => {
+    try {
+      setActionLoading(true);
+      let response;
 
-    // Handle Paid action - just show confirmation
-    if (action === 'paid') {
-      // Open paid confirmation modal
-      setPaidModal({ open: true, booking: booking, pendingConfirm: true });
-      setActionLoading(false);
-      return;
-    }
-
-    // Handle Cancel action
-    if (action === 'cancel') {
-      // Open cancel confirmation modal
-      setCancelModal({ open: true, booking: booking });
-      setActionLoading(false);
-      return;
-    }
-
-    // Handle Check-in action - show confirmation modal (user must confirm)
-    if (action === 'checkin') {
-      // Open check-in confirmation modal
-      setCheckinModal({ open: true, booking: booking, pendingConfirm: true });
-      setActionLoading(false);
-      return;
-    }
-
-    // Handle Check-out action - just show confirmation
-    if (action === 'checkout') {
-      // Open checkout confirmation modal
-      setCheckoutModal({ open: true, booking: booking, pendingConfirm: true });
-      setActionLoading(false);
-      return;
-    }
-
-    if (response) {
-      const result = await response.json();
-      if (result.success) {
-        await refetch(); // Refresh bookings after action
-      } else {
-        alert(`${action.charAt(0).toUpperCase() + action.slice(1)} failed: ` + (result.message || result.error));
+      // Handle Paid action - just show confirmation
+      if (action === 'paid') {
+        // Open paid confirmation modal
+        setPaidModal({ open: true, booking: booking, pendingConfirm: true });
+        setActionLoading(false);
+        return;
       }
+
+      // Handle Cancel action
+      if (action === 'cancel') {
+        // Open cancel confirmation modal
+        setCancelModal({ open: true, booking: booking });
+        setActionLoading(false);
+        return;
+      }
+
+      // Handle Check-in action - show confirmation modal (user must confirm)
+      if (action === 'checkin') {
+        // Open check-in confirmation modal
+        setCheckinModal({ open: true, booking: booking, pendingConfirm: true });
+        setActionLoading(false);
+        return;
+      }
+
+      // Handle Check-out action - just show confirmation
+      if (action === 'checkout') {
+        // Open checkout confirmation modal
+        setCheckoutModal({ open: true, booking: booking, pendingConfirm: true });
+        setActionLoading(false);
+        return;
+      }
+
+      if (response) {
+        const result = await response.json();
+        if (result.success) {
+          await refetch(); // Refresh bookings after action
+        } else {
+          alert(`${action.charAt(0).toUpperCase() + action.slice(1)} failed: ` + (result.message || result.error));
+        }
+      }
+    } catch (err) {
+      console.error('Action error', err);
+      alert('An error occurred. Check console.');
+    } finally {
+      setActionLoading(false);
     }
-  } catch (err) {
-    console.error('Action error', err);
-    alert('An error occurred. Check console.');
-  } finally {
-    setActionLoading(false);
-  }
-};
+  };
 
   // Handle cancel confirmation
   const handleCancelConfirm = async () => {
     if (!cancelModal.booking) return;
     try {
       setActionLoading(true);
+
       const response = await fetch(UPDATE_STATUS_API, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           booking_id: cancelModal.booking.bookingId,
           action: 'cancel',
         }),
       });
+
       const result = await response.json();
       if (result.success) {
         setCancelModal({ open: false, booking: null });
@@ -215,16 +236,13 @@ const Bookings = () => {
     }
   };
 
-
-
   const roomTypes = Array.from(new Set(bookings.map(b => b.roomType))).filter(Boolean);
-
 
   const totalPages = Math.max(1, Math.ceil(filteredBookings.length / pageSize));
   const paginatedBookings = (filteredBookings || []).slice((page - 1) * pageSize, page * pageSize);
   
   // Status Config
-const STATUS_CONFIG = {
+  const STATUS_CONFIG = {
     confirmed: { color: 'bg-green-100 text-green-800 border-green-200', label: 'Confirmed' },
     cancelled: { color: 'bg-red-100 text-red-800 border-red-200', label: 'Cancelled' },
     'no-show': { color: 'bg-gray-100 text-gray-700 border-gray-200', label: 'No-Show' },
@@ -234,21 +252,19 @@ const STATUS_CONFIG = {
     'Checked-out': { color: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Checked-Out' },
     'Cancelled': { color: 'bg-red-100 text-red-800 border-red-200', label: 'Cancelled' },
     'Confirmed': { color: 'bg-green-100 text-green-800 border-green-200', label: 'Confirmed' }
-};
+  };
 
+  const getStatusConfig = (b) => STATUS_CONFIG[b.status] || STATUS_CONFIG.confirmed;  
 
-const getStatusConfig = (b) => STATUS_CONFIG[b.status] || STATUS_CONFIG.confirmed;  
+  // Subtle row background highlights by status
+  const ROW_BG = {
+    confirmed: 'bg-green-50',
+    checked_in: 'bg-blue-50',
+    checked_out: 'bg-gray-50',
+    cancelled: 'bg-red-50',
+  };
 
-// Subtle row background highlights by status
-const ROW_BG = {
-  confirmed: 'bg-green-50',
-  checked_in: 'bg-blue-50',
-  checked_out: 'bg-gray-50',
-  cancelled: 'bg-red-50',
-};
-
-const getRowBgClass = (status) => ROW_BG[status] || '';
-
+  const getRowBgClass = (status) => ROW_BG[status] || '';
 
   return (
     <div className="w-full bg-white min-h-screen font-['Poppins']">
@@ -308,172 +324,168 @@ const getRowBgClass = (status) => ROW_BG[status] || '';
         </div>
 
         {/* Table */}
-<div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-  {loading ? (
-    <div className="py-16 text-center">
-      <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-      <p className="mt-3 text-gray-500 text-sm">Loading bookings...</p>
-    </div>
-  ) : (
-    <div className="overflow-x-auto">
-      <table className="w-full">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {loading ? (
+            <div className="py-16 text-center">
+              <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+              <p className="mt-3 text-gray-500 text-sm">Loading bookings...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Booking ID</th>
+                    <th className="py-4 px-4 text-left text-sm font-medium text-gray-700">Guest Name</th>
+                    <th className="py-4 px-4 text-left text-sm font-medium text-gray-700">Room Type</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Room No.</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Check-in</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Check-out</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Guests</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Total</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Payment</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Status</th>
+                    <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Actions</th>
+                  </tr>
+                </thead>
 
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Booking ID</th>
-                  <th className="py-4 px-4 text-left text-sm font-medium text-gray-700">Guest Name</th>
-                  <th className="py-4 px-4 text-left text-sm font-medium text-gray-700">Room Type</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Room No.</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Check-in</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Check-out</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Guests</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Total</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Payment</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Status</th>
-                  <th className="py-4 px-4 text-center text-sm font-medium text-gray-700">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-200">
-                {paginatedBookings.map(b => {
-                  const sConf = getStatusConfig(b);
-                  const rowBg = getRowBgClass(b.status);
-                  return (
-                    <tr key={b._id} className={`${rowBg} hover:bg-gray-50 transition-colors`}>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900 font-mono">#{String(b._id).slice(-6)}</td>
-                      <td className="py-4 px-4 text-left text-sm text-gray-900">
-                        <div className="font-medium">{b.guestName}</div>
-                        {b.email && (
-                          <div className="text-xs text-gray-500 mt-0.5">{b.email}</div>
-                        )}
-                      </td>
-                      <td className="py-4 px-4 text-left text-sm text-gray-900">{b.roomType}</td>
-
-                      <td className="py-4 px-4 text-center text-sm text-gray-900">{b.roomNumber || '—'}</td>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900">
-                        {b.checkInDate ? (
-                          <>
-                            <div>{new Date(b.checkInDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</div>
-                            {b.checkInTime ? (
-                              <div className="text-xs text-gray-600 mt-0.5 font-medium">
-                                {new Date(b.checkInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                              </div>
-                            ) : (
+                <tbody className="divide-y divide-gray-200">
+                  {paginatedBookings.map(b => {
+                    const sConf = getStatusConfig(b);
+                    const rowBg = getRowBgClass(b.status);
+                    return (
+                      <tr key={b._id} className={`${rowBg} hover:bg-gray-50 transition-colors`}>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900 font-mono">#{String(b._id).slice(-6)}</td>
+                        <td className="py-4 px-4 text-left text-sm text-gray-900">
+                          <div className="font-medium">{b.guestName}</div>
+                          {b.email && (
+                            <div className="text-xs text-gray-500 mt-0.5">{b.email}</div>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-left text-sm text-gray-900">{b.roomType}</td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900">{b.roomNumber || '—'}</td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900">
+                          {b.checkInDate ? (
+                            <>
+                              <div>{new Date(b.checkInDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</div>
+                              {b.checkInTime ? (
+                                <div className="text-xs text-gray-600 mt-0.5 font-medium">
+                                  {new Date(b.checkInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-500 mt-0.5">—</div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div>—</div>
                               <div className="text-xs text-gray-500 mt-0.5">—</div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <div></div>
-                            <div className="text-xs text-gray-500 mt-0.5"></div>
-                          </>
-                        )}
-                      </td>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900">
-                        {b.checkOutDate ? (
-                          <>
-                            <div>{new Date(b.checkOutDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</div>
-                            {b.checkOutTime ? (
-                              <div className="text-xs text-gray-600 mt-0.5 font-medium">
-                                {new Date(b.checkOutTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                              </div>
-                            ) : (
+                            </>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900">
+                          {b.checkOutDate ? (
+                            <>
+                              <div>{new Date(b.checkOutDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</div>
+                              {b.checkOutTime ? (
+                                <div className="text-xs text-gray-600 mt-0.5 font-medium">
+                                  {new Date(b.checkOutTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-500 mt-0.5">—</div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div>—</div>
                               <div className="text-xs text-gray-500 mt-0.5">—</div>
+                            </>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900">{b.guests}</td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900 font-semibold">₱{(b.totalPrice || 0).toLocaleString()}</td>
+                        <td className="py-4 px-4 text-center text-sm text-gray-900">{b.paymentStatus}</td>
+                        <td className="py-4 px-4 text-center">
+                          <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${sConf.color}`}>{sConf.label}</span>
+                        </td>
+
+                        <td className="py-4 px-4 text-center">
+                          <div className="flex flex-row gap-2 items-center justify-center flex-nowrap">
+                            {/* Flow 1: Pending + Confirmed -> Mark as Paid & Cancel */}
+                            {b.status === 'confirmed' && b.normalizedPaymentStatus === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'paid')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-green-400 text-xs font-medium rounded-lg text-green-700 bg-white hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Mark as Paid
+                                </button>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'cancel')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Cancel
+                                </button>
+                              </>
                             )}
-                          </>
-                        ) : (
-                          <>
-                            <div></div>
-                            <div className="text-xs text-gray-500 mt-0.5"></div>
-                          </>
-                        )}
-                      </td>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900">{b.guests}</td>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900 font-semibold">₱{(b.totalPrice || 0).toLocaleString()}</td>
-                      <td className="py-4 px-4 text-center text-sm text-gray-900">{b.paymentStatus}</td>
-                      <td className="py-4 px-4 text-center">
-                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${sConf.color}`}>{sConf.label}</span>
-                      </td>
-
-                      <td className="py-4 px-4 text-center">
-  <div className="flex flex-row gap-2 items-center justify-center flex-nowrap">
-    {/* Flow 1: Pending + Confirmed -> Mark as Paid & Cancel */}
-    {b.status === 'confirmed' && b.normalizedPaymentStatus === 'pending' && (
-      <>
-        <button
-          onClick={() => handleBookingAction(b, 'paid')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-green-400 text-xs font-medium rounded-lg text-green-700 bg-white hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Mark as Paid
-        </button>
-        <button
-          onClick={() => handleBookingAction(b, 'cancel')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-      </>
-    )}
-    {/* Flow 2: Partial Payment + Confirmed -> Check-in & Cancel */}
-    {b.status === 'confirmed' && b.normalizedPaymentStatus === 'partial_payment' && (
-      <>
-        <button
-          onClick={() => handleBookingAction(b, 'checkin')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-blue-400 text-xs font-medium rounded-lg text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Check-in
-        </button>
-        <button
-          onClick={() => handleBookingAction(b, 'cancel')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-      </>
-    )}
-    {/* Flow 3: Partial Payment + Checked-in -> Check-out & Cancel */}
-    {b.status === 'checked_in' && b.normalizedPaymentStatus === 'partial_payment' && (
-      <>
-        <button
-          onClick={() => handleBookingAction(b, 'checkout')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-orange-400 text-xs font-medium rounded-lg text-orange-700 bg-white hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Check-out
-        </button>
-        <button
-          onClick={() => handleBookingAction(b, 'cancel')}
-          disabled={actionLoading}
-          className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-      </>
-    )}
-    {/* Flow 4: Payment Complete + Checked-out -> No actions (finished) */}
-    {b.status === 'checked_out' && b.normalizedPaymentStatus === 'payment_complete' && (
-      <span className="text-sm text-gray-500">—</span>
-    )}
-    {/* Cancelled -> No actions */}
-    {b.status === 'cancelled' && (
-      <span className="text-sm text-gray-500">—</span>
-    )}
-  </div>
-</td>
-
-                    </tr>
-                  );
-                })}
-              </tbody>
-                  </table>
-    </div>
-  )}
-</div>
-
+                            {/* Flow 2: Partial Payment + Confirmed -> Check-in & Cancel */}
+                            {b.status === 'confirmed' && b.normalizedPaymentStatus === 'partial_payment' && (
+                              <>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'checkin')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-blue-400 text-xs font-medium rounded-lg text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Check-in
+                                </button>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'cancel')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                            {/* Flow 3: Partial Payment + Checked-in -> Check-out & Cancel */}
+                            {b.status === 'checked_in' && b.normalizedPaymentStatus === 'partial_payment' && (
+                              <>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'checkout')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-orange-400 text-xs font-medium rounded-lg text-orange-700 bg-white hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Check-out
+                                </button>
+                                <button
+                                  onClick={() => handleBookingAction(b, 'cancel')}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center px-5 h-9 border border-transparent text-xs font-medium rounded-lg text-white bg-red-700 hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                            {/* Flow 4: Payment Complete + Checked-out -> No actions (finished) */}
+                            {b.status === 'checked_out' && b.normalizedPaymentStatus === 'payment_complete' && (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
+                            {/* Cancelled -> No actions */}
+                            {b.status === 'cancelled' && (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         {/* Pagination */}
         {filteredBookings.length > 0 && (
@@ -532,6 +544,7 @@ const getRowBgClass = (status) => ROW_BG[status] || '';
                   onClick={async () => {
                     setActionLoading(true);
                     try {
+                      const autoDatetime = toManilaDateTime();
                       const response = await fetch(UPDATE_STATUS_API, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -603,8 +616,7 @@ const getRowBgClass = (status) => ROW_BG[status] || '';
                   onClick={async () => {
                     setActionLoading(true);
                     try {
-                      const now = new Date();
-                      const autoDatetime = now.toISOString().slice(0, 19);
+                      const autoDatetime = toManilaDateTime();
                       const response = await fetch(UPDATE_STATUS_API, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -680,7 +692,7 @@ const getRowBgClass = (status) => ROW_BG[status] || '';
                       const now = new Date();
                       const bookingDate = checkinModal.booking?.checkInDate ? new Date(checkinModal.booking.checkInDate) : now;
                       bookingDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
-                      const autoDatetime = bookingDate.toISOString().slice(0, 19);
+                      const autoDatetime = toManilaDateTime();
 
                       const response = await fetch(UPDATE_STATUS_API, {
                         method: 'POST',
@@ -778,8 +790,6 @@ const getRowBgClass = (status) => ROW_BG[status] || '';
             </div>
           </div>
         )}
-
-
       </div>
     </div>
   );
